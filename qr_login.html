@@ -35,7 +35,7 @@ p{
 video{
     width:100%;
     border-radius:12px;
-    border:2px solid #1e88e5;
+    border:3px solid #1e88e5;
 }
 .status{
     margin-top:10px;
@@ -50,39 +50,48 @@ video{
 <div class="box">
     <h2>مسح كرت الواي فاي</h2>
     <p>وجه الكاميرا على الكيو آر</p>
-    <video id="video" autoplay></video>
+    <video id="video" autoplay playsinline></video>
     <div class="status" id="status">جاري فتح الكاميرا...</div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 <script>
 const video = document.getElementById("video");
 const statusText = document.getElementById("status");
 
-navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-.then(stream => {
-    video.srcObject = stream;
-    statusText.innerText = "امسح الكيو آر الآن";
-})
-.catch(() => {
-    statusText.innerText = "فشل فتح الكاميرا";
-});
-
-const canvas = document.createElement('canvas');
-const ctx = canvas.getContext('2d');
-
-setInterval(() => {
-    if(video.readyState !== video.HAVE_ENOUGH_DATA) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video,0,0);
-    const img = ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code = jsQR(img.data, img.width, img.height);
-    if(code){
-        const val = encodeURIComponent(code.data.trim());
-        window.location.href = "http://10.10.10.1/login?username="+val+"&password="+val;
+async function startCamera(){
+    try{
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video:{ facingMode:"environment" }
+        });
+        video.srcObject = stream;
+        statusText.innerText = "امسح الكيو آر الآن";
+        startScan();
+    }catch(e){
+        statusText.innerText = "فشل فتح الكاميرا";
     }
-},700);
+}
+
+async function startScan(){
+    if(!("BarcodeDetector" in window)){
+        statusText.innerText = "المتصفح غير مدعوم";
+        return;
+    }
+
+    const detector = new BarcodeDetector({ formats:["qr_code"] });
+
+    setInterval(async ()=>{
+        try{
+            const barcodes = await detector.detect(video);
+            if(barcodes.length){
+                const val = encodeURIComponent(barcodes[0].rawValue.trim());
+                window.location.href =
+                  "http://10.10.10.1/login?username=" + val + "&password=" + val;
+            }
+        }catch(e){}
+    },500);
+}
+
+startCamera();
 </script>
 
 </body>
