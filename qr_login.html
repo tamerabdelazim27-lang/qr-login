@@ -7,92 +7,102 @@
 
 <style>
 body{
-    margin:0;
-    font-family: Arial, Tahoma;
-    background:#f5f7fb;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    height:100vh;
+  margin:0;
+  font-family: Arial, Tahoma;
+  background:#f5f7fb;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
 }
 .box{
-    background:#fff;
-    width:360px;
-    padding:20px;
-    border-radius:16px;
-    box-shadow:0 10px 30px rgba(0,0,0,.1);
-    text-align:center;
+  background:#fff;
+  width:360px;
+  padding:20px;
+  border-radius:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.1);
+  text-align:center;
 }
-h2{
-    margin:10px 0 5px;
-    color:#1e88e5;
-}
-p{
-    margin:0 0 15px;
-    color:#555;
-    font-size:14px;
-}
+h2{color:#1e88e5;margin:10px 0;}
+p{color:#555;font-size:14px;}
 video{
-    width:100%;
-    border-radius:12px;
-    border:3px solid #1e88e5;
+  width:100%;
+  border-radius:12px;
+  border:3px solid #1e88e5;
 }
-.status{
-    margin-top:10px;
-    font-size:14px;
-    color:#1e88e5;
+button{
+  margin-top:15px;
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  background:#1e88e5;
+  color:#fff;
+  font-size:16px;
 }
+input{display:none;}
 </style>
 </head>
 
 <body>
-
 <div class="box">
-    <h2>مسح كرت الواي فاي</h2>
-    <p>وجه الكاميرا على الكيو آر</p>
-    <video id="video" autoplay playsinline></video>
-    <div class="status" id="status">جاري فتح الكاميرا...</div>
+  <h2>مسح كرت الواي فاي</h2>
+  <p>جرّب المسح التلقائي أو اضغط الزر</p>
+
+  <video id="video" autoplay playsinline></video>
+
+  <button onclick="openNativeScanner()">📷 مسح بالكاميرا</button>
+  <input id="fileInput" type="file" accept="image/*" capture="environment">
 </div>
 
 <script>
 const video = document.getElementById("video");
-const statusText = document.getElementById("status");
 
-async function startCamera(){
-    try{
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video:{ facingMode:"environment" }
-        });
-        video.srcObject = stream;
-        statusText.innerText = "امسح الكيو آر الآن";
-        startScan();
-    }catch(e){
-        statusText.innerText = "فشل فتح الكاميرا";
+// محاولة مسح تلقائي (لو مدعوم)
+(async ()=>{
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    video.srcObject = stream;
+
+    if("BarcodeDetector" in window){
+      const detector = new BarcodeDetector({formats:["qr_code"]});
+      setInterval(async ()=>{
+        const codes = await detector.detect(video);
+        if(codes.length){
+          goLogin(codes[0].rawValue);
+        }
+      },500);
     }
+  }catch(e){}
+})();
+
+// الحل المضمون
+function openNativeScanner(){
+  document.getElementById("fileInput").click();
 }
 
-async function startScan(){
-    if(!("BarcodeDetector" in window)){
-        statusText.innerText = "المتصفح غير مدعوم";
-        return;
+document.getElementById("fileInput").addEventListener("change", async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+
+  const img = new Image();
+  img.onload = async ()=>{
+    const detector = new BarcodeDetector({formats:["qr_code"]});
+    const codes = await detector.detect(img);
+    if(codes.length){
+      goLogin(codes[0].rawValue);
+    }else{
+      alert("لم يتم قراءة الكود");
     }
+  };
+  img.src = URL.createObjectURL(file);
+});
 
-    const detector = new BarcodeDetector({ formats:["qr_code"] });
-
-    setInterval(async ()=>{
-        try{
-            const barcodes = await detector.detect(video);
-            if(barcodes.length){
-                const val = encodeURIComponent(barcodes[0].rawValue.trim());
-                window.location.href =
-                  "http://10.10.10.1/login?username=" + val + "&password=" + val;
-            }
-        }catch(e){}
-    },500);
+function goLogin(val){
+  val = encodeURIComponent(val.trim());
+  window.location.href =
+    "http://10.10.10.1/login?username="+val+"&password="+val;
 }
-
-startCamera();
 </script>
-
 </body>
 </html>
